@@ -30,10 +30,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.Scanner;
 
 public class MainActivity extends AppCompatActivity {
     private Button m_submitLogs;
@@ -105,7 +103,7 @@ public class MainActivity extends AppCompatActivity {
     public static String convertStreamToString(InputStream is) throws Exception {
         BufferedReader reader = new BufferedReader(new InputStreamReader(is));
         StringBuilder sb = new StringBuilder();
-        String line = null;
+        String line;
         while ((line = reader.readLine()) != null) {
             sb.append(line).append("\n");
         }
@@ -141,13 +139,14 @@ public class MainActivity extends AppCompatActivity {
 
                 try {
                     String content = getStringFromFile(file);
-                    Log.d("Quadavore", content);
 
                     JsonObject json = new JsonObject();
                     json.addProperty("user_id", m_userToken);
                     json.addProperty("user_name", "Android Thing");
                     json.addProperty("csv_raw", content);
                     json.addProperty("file_name", file.getName());
+
+                    final File fileRef = file;
 
                     Ion.with(this)
                             .load("PUT", "http://192.168.1.102:1991/flight_log")
@@ -156,8 +155,12 @@ public class MainActivity extends AppCompatActivity {
                             .setCallback(new FutureCallback<JsonObject>() {
                                 @Override
                                 public void onCompleted(Exception e, JsonObject result) {
-                                    Log.d("Quadavore", "heh: " + result);
-                                    // do stuff with the result or error
+                                    if (e == null) {
+                                        Toast.makeText(getApplicationContext(), "Uploaded " + fileRef.getName(), Toast.LENGTH_SHORT).show();
+                                    }
+                                    else {
+                                        Toast.makeText(getApplicationContext(), "Failure " + e.toString(), Toast.LENGTH_SHORT).show();
+                                    }
                                 }
                             });
 
