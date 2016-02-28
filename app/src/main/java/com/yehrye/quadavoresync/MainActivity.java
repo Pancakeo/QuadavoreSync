@@ -184,9 +184,13 @@ public class MainActivity extends AppCompatActivity {
 
         m_sharedPreferences = getSharedPreferences("quadavore.settings", Context.MODE_PRIVATE);
         String currentUserToken = m_sharedPreferences.getString("userToken", "");
+        String currentServerOverride = m_sharedPreferences.getString("serverOverride", "");
 
         EditText userToken = (EditText) findViewById(R.id.userToken);
         userToken.setText(currentUserToken);
+
+        final EditText serverOverride = (EditText) findViewById(R.id.serverOverride);
+        serverOverride.setText(currentServerOverride);
 
         m_submitLogs = (Button) findViewById(R.id.submit_logs);
 
@@ -202,13 +206,19 @@ public class MainActivity extends AppCompatActivity {
         m_submitLogs.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                m_server = serverSpinner.getSelectedItem().toString();
+
+                String serverOverrideValue = serverOverride.getText().toString().trim();
+                if (serverOverrideValue.length() > 0) {
+                    m_server = serverOverrideValue;
+                }
+
                 SharedPreferences.Editor editor = m_sharedPreferences.edit();
                 EditText userToken = (EditText) findViewById(R.id.userToken);
-                Log.d("Quadavore", userToken.getText().toString());
-                editor.putString("userToken", userToken.getText().toString());
+                editor.putString("userToken", userToken.getText().toString().trim());
+                editor.putString("serverOverride", serverOverrideValue);
                 editor.apply();
 
-                m_server = serverSpinner.getSelectedItem().toString();
                 Log.d("Quadavore", m_server);
 
                 m_userToken = userToken.getText().toString().trim();
