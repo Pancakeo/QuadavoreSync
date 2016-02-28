@@ -18,8 +18,10 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.Toast;
 
 import com.google.gson.JsonObject;
@@ -37,6 +39,7 @@ public class MainActivity extends AppCompatActivity {
     private Button m_submitLogs;
     private SharedPreferences m_sharedPreferences;
     private String m_userToken;
+    private String m_server = "http://yehrye.com:1991";
 
     /* Checks if external storage is available to at least read */
     public boolean isExternalStorageReadable() {
@@ -149,7 +152,7 @@ public class MainActivity extends AppCompatActivity {
                     final File fileRef = file;
 
                     Ion.with(this)
-                            .load("PUT", "http://192.168.1.102:1991/flight_log")
+                            .load("PUT", m_server + "/flight_log")
                             .setJsonObjectBody(json)
                             .asJsonObject()
                             .setCallback(new FutureCallback<JsonObject>() {
@@ -157,8 +160,7 @@ public class MainActivity extends AppCompatActivity {
                                 public void onCompleted(Exception e, JsonObject result) {
                                     if (e == null) {
                                         Toast.makeText(getApplicationContext(), "Uploaded " + fileRef.getName(), Toast.LENGTH_SHORT).show();
-                                    }
-                                    else {
+                                    } else {
                                         Toast.makeText(getApplicationContext(), "Failure " + e.toString(), Toast.LENGTH_SHORT).show();
                                     }
                                 }
@@ -191,6 +193,11 @@ public class MainActivity extends AppCompatActivity {
         // Request permissions, if needed.
         requestPermissions();
 
+        final Spinner serverSpinner = (Spinner) findViewById(R.id.spinner);
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this, R.array.server_array, android.R.layout.simple_spinner_item);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        serverSpinner.setAdapter(adapter);
+
         m_submitLogs.setTransformationMethod(null);  // avoid all caps.
         m_submitLogs.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -200,6 +207,9 @@ public class MainActivity extends AppCompatActivity {
                 Log.d("Quadavore", userToken.getText().toString());
                 editor.putString("userToken", userToken.getText().toString());
                 editor.apply();
+
+                m_server = serverSpinner.getSelectedItem().toString();
+                Log.d("Quadavore", m_server);
 
                 m_userToken = userToken.getText().toString().trim();
                 if (m_userToken.length() >= 3) {

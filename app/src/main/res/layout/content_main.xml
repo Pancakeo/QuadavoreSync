@@ -21,8 +21,9 @@
         android:enabled="false"
         android:nestedScrollingEnabled="true"
         android:layout_below="@+id/userToken"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true" />
+        android:layout_alignRight="@+id/textView"
+        android:layout_alignEnd="@+id/textView"
+        android:layout_marginTop="115dp" />
 
     <TextView
         android:layout_width="wrap_content"
@@ -43,5 +44,24 @@
         android:layout_alignParentRight="true"
         android:layout_alignParentEnd="true"
         android:layout_below="@+id/textView" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Server:"
+        android:id="@+id/textView2"
+        android:layout_below="@+id/userToken"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true" />
+
+    <Spinner
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/spinner"
+        android:layout_below="@+id/textView2"
+        android:layout_alignLeft="@+id/submit_logs"
+        android:layout_alignStart="@+id/submit_logs"
+        android:spinnerMode="dropdown" />
 
 </RelativeLayout>
