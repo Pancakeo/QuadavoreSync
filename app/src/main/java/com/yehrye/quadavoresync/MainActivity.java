@@ -3,10 +3,13 @@ package com.yehrye.quadavoresync;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Environment;
+import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -16,12 +19,26 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.Toast;
 
+import com.google.gson.JsonObject;
+import com.koushikdutta.async.future.FutureCallback;
+import com.koushikdutta.ion.Ion;
+
+import java.io.BufferedReader;
 import java.io.File;
-import java.util.Arrays;
+import java.io.FileFilter;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.Scanner;
 
 public class MainActivity extends AppCompatActivity {
+    private Button m_submitLogs;
+    private SharedPreferences m_sharedPreferences;
+    private String m_userToken;
 
     /* Checks if external storage is available to at least read */
     public boolean isExternalStorageReadable() {
@@ -31,11 +48,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
         switch (requestCode) {
             case 42: {
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    goodToGoProbably();
                     Log.d("Quadavore", "PERMISSION GRANTED");
                 } else {
                     Log.d("Quadavore", "Uh oh");
@@ -44,16 +62,21 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    void goodToGoProbably() {
+        if (isExternalStorageReadable()) {
+            m_submitLogs.setEnabled(true);
+        } else {
+            Log.d("Quadavore", "Storage isn't readable for some reason.");
+        }
+    }
+
     void requestPermissions() {
         final Activity thisActivity = this;
 
-        if (ContextCompat.checkSelfPermission(thisActivity,
-                Manifest.permission.READ_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(thisActivity, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
 
             // Should we show an explanation?
             if (ActivityCompat.shouldShowRequestPermissionRationale(thisActivity, Manifest.permission.READ_EXTERNAL_STORAGE)) {
-                Log.d("Quadavore", "wup - needs rationale");
 
                 new AlertDialog.Builder(this)
                         .setTitle("Permission Rationale")
@@ -65,48 +88,85 @@ public class MainActivity extends AppCompatActivity {
                         })
                         .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int which) {
-                                // Okay then.
+                                // Do nothing
                             }
                         })
                         .setIcon(android.R.drawable.ic_dialog_alert)
                         .show();
             } else {
 
-                // No explanation needed, we can request the permission:
                 ActivityCompat.requestPermissions(thisActivity, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 42);
-                Log.d("Quadavore", "wup - uhh...");
+            }
+        } else {
+            goodToGoProbably();
+        }
+    }
+
+    public static String convertStreamToString(InputStream is) throws Exception {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+        StringBuilder sb = new StringBuilder();
+        String line = null;
+        while ((line = reader.readLine()) != null) {
+            sb.append(line).append("\n");
+        }
+        reader.close();
+        return sb.toString();
+    }
+
+    public static String getStringFromFile(File file) throws Exception {
+        FileInputStream fin = new FileInputStream(file);
+        String ret = convertStreamToString(fin);
+        //Make sure you close all streams.
+        fin.close();
+        return ret;
+    }
+
+    void processLitchiLogs() {
+        File quadLogs = new File(Environment.getExternalStorageDirectory(), "/LitchiApp/flightlogs");
+        Log.d("Quadavore", "Litchi file path: " + quadLogs.getAbsolutePath());
+
+        if (quadLogs.isDirectory()) {
+            Log.d("Quadavore", "Exists: " + quadLogs.exists());
+            Log.d("Quadavore", "Found Litchi log folder.");
+
+            File[] files = quadLogs.listFiles(new FileFilter() {
+                @Override
+                public boolean accept(File pathname) {
+                    return pathname.getName().toLowerCase().contains(".csv");
+                }
+            });
+
+            for (File file : files) {
+                Log.d("Quadavore", "Uploading file " + file.getName() + ", size: " + file.length());
+
+                try {
+                    String content = getStringFromFile(file);
+                    Log.d("Quadavore", content);
+
+                    JsonObject json = new JsonObject();
+                    json.addProperty("user_id", m_userToken);
+                    json.addProperty("user_name", "Android Thing");
+                    json.addProperty("csv_raw", content);
+                    json.addProperty("file_name", file.getName());
+
+                    Ion.with(this)
+                            .load("PUT", "http://192.168.1.102:1991/flight_log")
+                            .setJsonObjectBody(json)
+                            .asJsonObject()
+                            .setCallback(new FutureCallback<JsonObject>() {
+                                @Override
+                                public void onCompleted(Exception e, JsonObject result) {
+                                    Log.d("Quadavore", "heh: " + result);
+                                    // do stuff with the result or error
+                                }
+                            });
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
             }
         }
-    }
-
-    void readLitchiLogs() {
-        File djiFile = new File(Environment.getExternalStorageDirectory(), "/LitchiApp/flightlogs");
-        Log.d("Quadavore", "DJI file path: " + djiFile.getAbsolutePath());
-
-        if (djiFile.isDirectory()) {
-            Log.d("Quadavore", "Exists: " + djiFile.exists());
-            Log.d("Quadavore", "Found DJI log path.");
-            Log.d("Quadavore", "Herrrrg: " + djiFile.canRead());
-            Log.d("Quadavore", "list: " + Arrays.toString(djiFile.list()));
-
-            Toast.makeText(getApplicationContext(), "Heh: " + Arrays.toString(djiFile.listFiles()), Toast.LENGTH_SHORT).show();
-//                    File[] files = djiFile.listFiles();
-//                    File[] files = djiFile.listFiles(new FileFilter() {
-//                        @Override
-//                        public boolean accept(File pathname) {
-//                            Log.d("Quadavore", pathname.getName().toLowerCase().contains(".txt") + "");
-//                            return pathname.getName().toLowerCase().contains(".txt");
-//                        }
-//                    });
-
-//                    for (File file : files) {
-//                        Log.d("Quadavore", "dji " + file.getName());
-//                    }
-        }
-
-    }
-
-    void readDJILogs() {
 
     }
 
@@ -117,17 +177,33 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+        m_sharedPreferences = getSharedPreferences("quadavore.settings", Context.MODE_PRIVATE);
+        String currentUserToken = m_sharedPreferences.getString("userToken", "");
+
+        EditText userToken = (EditText) findViewById(R.id.userToken);
+        userToken.setText(currentUserToken);
+
+        m_submitLogs = (Button) findViewById(R.id.submit_logs);
+
         // Request permissions, if needed.
         requestPermissions();
 
-        final Button but = (Button) findViewById(R.id.submit_logs);
-        but.setTransformationMethod(null);  // avoid all caps.
-
-        but.setOnClickListener(new View.OnClickListener() {
+        m_submitLogs.setTransformationMethod(null);  // avoid all caps.
+        m_submitLogs.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                readLitchiLogs();
-                readDJILogs();
+                SharedPreferences.Editor editor = m_sharedPreferences.edit();
+                EditText userToken = (EditText) findViewById(R.id.userToken);
+                Log.d("Quadavore", userToken.getText().toString());
+                editor.putString("userToken", userToken.getText().toString());
+                editor.apply();
+
+                m_userToken = userToken.getText().toString().trim();
+                if (m_userToken.length() >= 3) {
+                    processLitchiLogs();
+                } else {
+                    Toast.makeText(getApplicationContext(), "User token must at least 3 characters.", Toast.LENGTH_SHORT).show();
+                }
             }
         });
 
@@ -136,7 +212,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
+//        getMenuInflater().inflate(R.menu.menu_main, menu);
         return true;
     }
 

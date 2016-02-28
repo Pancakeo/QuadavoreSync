@@ -18,9 +18,9 @@
         android:text="Submit Logs"
         android:id="@+id/submit_logs"
         android:textColor="#7d2ebe"
-        android:enabled="true"
+        android:enabled="false"
         android:nestedScrollingEnabled="true"
-        android:layout_below="@+id/editText"
+        android:layout_below="@+id/userToken"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true" />
 
@@ -28,7 +28,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceLarge"
-        android:text="User ID:"
+        android:text="User Token:"
         android:id="@+id/textView"
         android:layout_alignParentTop="true"
         android:layout_alignParentLeft="true"
@@ -37,7 +37,7 @@
     <EditText
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:id="@+id/editText"
+        android:id="@+id/userToken"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
         android:layout_alignParentRight="true"
