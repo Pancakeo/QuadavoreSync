@@ -103,23 +103,38 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public static String convertStreamToString(InputStream is) throws Exception {
-        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-        StringBuilder sb = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            sb.append(line).append("\n");
+    void sendFile(final File[] files, final int current) {
+        if (current >= files.length) {
+            Log.d("Quadavore", "done uploading batch");
+            return;
         }
-        reader.close();
-        return sb.toString();
-    }
 
-    public static String getStringFromFile(File file) throws Exception {
-        FileInputStream fin = new FileInputStream(file);
-        String ret = convertStreamToString(fin);
-        //Make sure you close all streams.
-        fin.close();
-        return ret;
+        final File file = files[current];
+
+        Log.d("Quadavore", "Uploading file " + file.getName() + ", size: " + file.length());
+        Ion.with(this)
+                .load("PUT", m_server + "/flight_log")
+                .setTimeout(1000 * 60 * 5)     // 5 minutes
+                .setMultipartParameter("user_id", m_userToken)
+                .setMultipartParameter("user_name", "Android Thing")
+                .setMultipartParameter("file_name", file.getName())
+                .setMultipartFile("uploaded_file", file)
+                .asJsonObject()
+                .setCallback(new FutureCallback<JsonObject>() {
+                    @Override
+                    public void onCompleted(Exception e, JsonObject result) {
+                        Log.d("Quadavore", file.getName() + " has completed.");
+
+                        if (e == null) {
+                            Log.d("Quadavore", "Uploaded probably worked: " + result);
+                            Toast.makeText(getApplicationContext(), "Uploaded " + file.getName(), Toast.LENGTH_SHORT).show();
+                            sendFile(files, current + 1);
+                        } else {
+                            Log.d("Quadavore", "Uploaded probably failed: " + result);
+                            Toast.makeText(getApplicationContext(), "Failure " + e.toString(), Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
     }
 
     void uploadLogs(String logPath, FileFilter fileFilter) {
@@ -129,45 +144,7 @@ public class MainActivity extends AppCompatActivity {
         if (quadLogs.isDirectory()) {
             File[] files = quadLogs.listFiles(fileFilter);
 
-            for (File file : files) {
-                Log.d("Quadavore", "Uploading file " + file.getName() + ", size: " + file.length());
-
-                try {
-                    String content = getStringFromFile(file);
-                    // TODO multipart
-
-//                    JsonObject json = new JsonObject();
-//                    json.addProperty("user_id", m_userToken);
-//                    json.addProperty("user_name", "Android Thing");
-//                    json.addProperty("csv_raw", content);
-//                    json.addProperty("file_name", file.getName());
-
-                    final File fileRef = file;
-
-                    Ion.with(this)
-                            .load("PUT", m_server + "/flight_log")
-                            .setTimeout(1000 * 60 * 5)     // 5 minutes
-                            .setMultipartParameter("user_id", m_userToken)
-                            .setMultipartParameter("user_name", "Android Thing")
-                            .setMultipartParameter("file_name", file.getName())
-                            .setMultipartFile("uploaded_file", file)
-                            .asJsonObject()
-                            .setCallback(new FutureCallback<JsonObject>() {
-                                @Override
-                                public void onCompleted(Exception e, JsonObject result) {
-                                    if (e == null) {
-                                        Toast.makeText(getApplicationContext(), "Uploaded " + fileRef.getName(), Toast.LENGTH_SHORT).show();
-                                    } else {
-                                        Toast.makeText(getApplicationContext(), "Failure " + e.toString(), Toast.LENGTH_SHORT).show();
-                                    }
-                                }
-                            });
-
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
-            }
+            sendFile(files, 0);
         }
 
     }
