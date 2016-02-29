@@ -122,38 +122,35 @@ public class MainActivity extends AppCompatActivity {
         return ret;
     }
 
-    void processLitchiLogs() {
-        File quadLogs = new File(Environment.getExternalStorageDirectory(), "/LitchiApp/flightlogs");
-        Log.d("Quadavore", "Litchi file path: " + quadLogs.getAbsolutePath());
+    void uploadLogs(String logPath, FileFilter fileFilter) {
+        File quadLogs = new File(Environment.getExternalStorageDirectory(), logPath);
+        Log.d("Quadavore", "Log path " + logPath + " is directory: " + quadLogs.isDirectory());
 
         if (quadLogs.isDirectory()) {
-            Log.d("Quadavore", "Exists: " + quadLogs.exists());
-            Log.d("Quadavore", "Found Litchi log folder.");
-
-            File[] files = quadLogs.listFiles(new FileFilter() {
-                @Override
-                public boolean accept(File pathname) {
-                    return pathname.getName().toLowerCase().contains(".csv");
-                }
-            });
+            File[] files = quadLogs.listFiles(fileFilter);
 
             for (File file : files) {
                 Log.d("Quadavore", "Uploading file " + file.getName() + ", size: " + file.length());
 
                 try {
                     String content = getStringFromFile(file);
+                    // TODO multipart
 
-                    JsonObject json = new JsonObject();
-                    json.addProperty("user_id", m_userToken);
-                    json.addProperty("user_name", "Android Thing");
-                    json.addProperty("csv_raw", content);
-                    json.addProperty("file_name", file.getName());
+//                    JsonObject json = new JsonObject();
+//                    json.addProperty("user_id", m_userToken);
+//                    json.addProperty("user_name", "Android Thing");
+//                    json.addProperty("csv_raw", content);
+//                    json.addProperty("file_name", file.getName());
 
                     final File fileRef = file;
 
                     Ion.with(this)
                             .load("PUT", m_server + "/flight_log")
-                            .setJsonObjectBody(json)
+                            .setTimeout(1000 * 60 * 5)     // 5 minutes
+                            .setMultipartParameter("user_id", m_userToken)
+                            .setMultipartParameter("user_name", "Android Thing")
+                            .setMultipartParameter("file_name", file.getName())
+                            .setMultipartFile("uploaded_file", file)
                             .asJsonObject()
                             .setCallback(new FutureCallback<JsonObject>() {
                                 @Override
@@ -223,7 +220,20 @@ public class MainActivity extends AppCompatActivity {
 
                 m_userToken = userToken.getText().toString().trim();
                 if (m_userToken.length() >= 3) {
-                    processLitchiLogs();
+                    uploadLogs("/LitchiApp/flightlogs", new FileFilter() {
+                        @Override
+                        public boolean accept(File pathname) {
+                            return pathname.getPath().toLowerCase().contains(".csv");
+                        }
+                    });
+
+//                    uploadLogs("DJI/dji.pilot/FlightRecord", new FileFilter() {
+//                        @Override
+//                        public boolean accept(File pathname) {
+//                            return pathname.getPath().toLowerCase().contains(".txt");
+//                        }
+//                    });
+
                 } else {
                     Toast.makeText(getApplicationContext(), "User token must at least 3 characters.", Toast.LENGTH_SHORT).show();
                 }
