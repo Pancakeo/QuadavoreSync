@@ -3,7 +3,7 @@
     <string name="action_settings">Settings</string>
 
     <string-array name="server_array">
-        <item>http://yehrye.com:1991</item>
+        <item>http://quadavore.yehrye.com</item>
         <item>http://192.168.1.102:1991</item>
     </string-array>
 </resources>

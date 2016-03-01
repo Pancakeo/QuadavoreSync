@@ -29,11 +29,18 @@ import com.koushikdutta.async.future.FutureCallback;
 import com.koushikdutta.ion.Ion;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.util.Arrays;
+import java.util.Scanner;
+import java.util.zip.GZIPOutputStream;
 
 public class MainActivity extends AppCompatActivity {
     private Button m_submitLogs;
@@ -103,6 +110,33 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    String convertStreamToString(File f) {
+
+        try {
+            InputStream is = new FileInputStream(f);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+            StringBuilder sb = new StringBuilder();
+            String line = null;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append("\n");
+            }
+            reader.close();
+            return sb.toString();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    byte[] compress(String string) throws IOException {
+        ByteArrayOutputStream os = new ByteArrayOutputStream(string.length());
+        GZIPOutputStream gos = new GZIPOutputStream(os);
+        gos.write(string.getBytes());
+        gos.close();
+        byte[] compressed = os.toByteArray();
+        os.close();
+        return compressed;
+    }
+
     void sendFile(final File[] files, final int current) {
         if (current >= files.length) {
             Log.d("Quadavore", "done uploading batch");
@@ -110,6 +144,26 @@ public class MainActivity extends AppCompatActivity {
         }
 
         final File file = files[current];
+        String content = convertStreamToString(file);
+
+        // Compression.
+        File outputDir = getApplicationContext().getCacheDir(); // context being the Activity pointer
+        File outputFile;
+
+        try {
+            byte[] compressed = compress(content);
+            Log.d("Quadavore", "heh " + Arrays.toString(compressed));
+
+            outputFile = File.createTempFile("upload", "csv", outputDir);
+            FileOutputStream fos = new FileOutputStream(outputFile);
+            fos.write(compressed);
+            fos.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        // TODO will need a way to clean up temp files.
+        final File compressedFile = outputFile;
 
         Log.d("Quadavore", "Uploading file " + file.getName() + ", size: " + file.length());
         Ion.with(this)
@@ -118,7 +172,8 @@ public class MainActivity extends AppCompatActivity {
                 .setMultipartParameter("user_id", m_userToken)
                 .setMultipartParameter("user_name", "Android Thing")
                 .setMultipartParameter("file_name", file.getName())
-                .setMultipartFile("uploaded_file", file)
+                .setMultipartParameter("is_gzip", "yup")
+                .setMultipartFile("uploaded_file", compressedFile)
                 .asJsonObject()
                 .setCallback(new FutureCallback<JsonObject>() {
                     @Override
@@ -127,6 +182,9 @@ public class MainActivity extends AppCompatActivity {
 
                         if (e == null) {
                             Log.d("Quadavore", "Uploaded probably worked: " + result);
+                            if (compressedFile.delete()) {
+                                Log.d("Quadavore", "Successfully deleted temp file " + compressedFile);
+                            }
                             Toast.makeText(getApplicationContext(), "Uploaded " + file.getName(), Toast.LENGTH_SHORT).show();
                             sendFile(files, current + 1);
                         } else {
