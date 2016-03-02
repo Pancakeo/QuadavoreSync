@@ -3,10 +3,15 @@ package com.yehrye.quadavoresync;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.annotation.NonNull;
@@ -22,31 +27,28 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.gson.JsonObject;
 import com.koushikdutta.async.future.FutureCallback;
 import com.koushikdutta.ion.Ion;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileFilter;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Scanner;
-import java.util.zip.GZIPOutputStream;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     private Button m_submitLogs;
     private SharedPreferences m_sharedPreferences;
     private String m_userToken;
     private String m_server = "http://yehrye.com:1991";
+    private SQLiteDatabase m_db;
+    private TextView m_status;
 
     /* Checks if external storage is available to at least read */
     public boolean isExternalStorageReadable() {
@@ -110,51 +112,24 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    String convertStreamToString(File f) {
-
-        try {
-            InputStream is = new FileInputStream(f);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-            StringBuilder sb = new StringBuilder();
-            String line = null;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line).append("\n");
-            }
-            reader.close();
-            return sb.toString();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    byte[] compress(String string) throws IOException {
-        ByteArrayOutputStream os = new ByteArrayOutputStream(string.length());
-        GZIPOutputStream gos = new GZIPOutputStream(os);
-        gos.write(string.getBytes());
-        gos.close();
-        byte[] compressed = os.toByteArray();
-        os.close();
-        return compressed;
-    }
-
     void sendFile(final File[] files, final int current) {
         if (current >= files.length) {
+            m_status.append("Done uploading!\n");
             Log.d("Quadavore", "done uploading batch");
             return;
         }
 
         final File file = files[current];
-        String content = convertStreamToString(file);
+        String content = HehUtil.convertStreamToString(file);
 
         // Compression.
         File outputDir = getApplicationContext().getCacheDir(); // context being the Activity pointer
         File outputFile;
 
         try {
-            byte[] compressed = compress(content);
-            Log.d("Quadavore", "heh " + Arrays.toString(compressed));
+            byte[] compressed = HehUtil.compress(content);
 
-            outputFile = File.createTempFile("upload", "csv", outputDir);
+            outputFile = File.createTempFile("upload", ".csv", outputDir);
             FileOutputStream fos = new FileOutputStream(outputFile);
             fos.write(compressed);
             fos.close();
@@ -162,8 +137,9 @@ public class MainActivity extends AppCompatActivity {
             throw new RuntimeException(e);
         }
 
-        // TODO will need a way to clean up temp files.
+        // TODO will need a way to clean up temp files (if app was closed prematurely or something).
         final File compressedFile = outputFile;
+        final String originalFileName = file.getName();
 
         Log.d("Quadavore", "Uploading file " + file.getName() + ", size: " + file.length());
         Ion.with(this)
@@ -182,6 +158,12 @@ public class MainActivity extends AppCompatActivity {
 
                         if (e == null) {
                             Log.d("Quadavore", "Uploaded probably worked: " + result);
+                            m_status.append("Probably uploaded " + originalFileName + "\n");
+
+                            ContentValues values = new ContentValues();
+                            values.put("log_name", originalFileName);
+
+                            m_db.insert("uploaded_logs", null, values);
                             if (compressedFile.delete()) {
                                 Log.d("Quadavore", "Successfully deleted temp file " + compressedFile);
                             }
@@ -202,7 +184,36 @@ public class MainActivity extends AppCompatActivity {
         if (quadLogs.isDirectory()) {
             File[] files = quadLogs.listFiles(fileFilter);
 
-            sendFile(files, 0);
+            List<File> filesToSend = new ArrayList<>();
+            String[] columns = new String[]{"log_name"};
+            Cursor c = m_db.query("uploaded_logs", columns, null, null, null, null, null);
+
+            List<String> filesSent = new ArrayList<>();
+            c.moveToFirst();
+            while (!c.isAfterLast()) {
+                String log_name = c.getString(0);
+                filesSent.add(log_name);
+                Log.d("Quadavore", "wup: " + log_name);
+                c.moveToNext();
+            }
+            c.close();
+
+            for (File f : files) {
+                if (!filesSent.contains(f.getName())) {
+                    filesToSend.add(f);
+                }
+            }
+
+            files = filesToSend.toArray(new File[filesToSend.size()]);
+
+            if (files.length > 0) {
+                m_status.append("Uploading " + files.length + " file(s).\n");
+                sendFile(files, 0);
+            } else {
+                m_status.append("No new files to upload.");
+                Toast.makeText(getApplicationContext(), "No new files to upload", Toast.LENGTH_SHORT).show();
+            }
+
         }
 
     }
@@ -213,6 +224,12 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+
+        HehStorage savedLogs = new HehStorage(getApplicationContext());
+        m_db = savedLogs.getReadableDatabase();
+
+        m_status = (TextView) findViewById(R.id.status);
+        m_status.append("Hello! Status shows up here.\n");
 
         m_sharedPreferences = getSharedPreferences("quadavore.settings", Context.MODE_PRIVATE);
         String currentUserToken = m_sharedPreferences.getString("userToken", "");
@@ -238,6 +255,17 @@ public class MainActivity extends AppCompatActivity {
         m_submitLogs.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                ConnectivityManager cm = (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+
+                NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+                boolean isConnected = activeNetwork != null && activeNetwork.isConnectedOrConnecting();
+                boolean isWiFi = isConnected && activeNetwork.getType() == ConnectivityManager.TYPE_WIFI;
+
+                if (!isWiFi) {
+                    Toast.makeText(getApplicationContext(), "Wifi connection required", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
                 m_server = serverSpinner.getSelectedItem().toString();
 
                 String serverOverrideValue = serverOverride.getText().toString().trim();
