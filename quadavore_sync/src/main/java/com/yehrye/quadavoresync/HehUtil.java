@@ -1,5 +1,7 @@
 package com.yehrye.quadavoresync;
 
+import android.os.Environment;
+
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -36,5 +38,11 @@ public class HehUtil {
         byte[] compressed = os.toByteArray();
         os.close();
         return compressed;
+    }
+
+    /* Checks if external storage is available to at least read */
+    public static boolean isExternalStorageReadable() {
+        String state = Environment.getExternalStorageState();
+        return Environment.MEDIA_MOUNTED.equals(state) || Environment.MEDIA_MOUNTED_READ_ONLY.equals(state);
     }
 }
