@@ -107,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
         m_db = savedLogs.getReadableDatabase();
 
         m_status = (TextView) findViewById(R.id.status);
-        m_status.append("Hello! Status shows up here.\n");
+        appendStatus("Hello! Status shows up here.");
 
         m_sharedPreferences = getSharedPreferences("quadavore.settings", Context.MODE_PRIVATE);
         String currentUserToken = m_sharedPreferences.getString("userToken", "");
@@ -177,7 +177,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void appendStatus(String msg) {
-        m_status.append(msg);
+        m_status.append(msg + '\n');
     }
 
     public SQLiteDatabase getDb() {

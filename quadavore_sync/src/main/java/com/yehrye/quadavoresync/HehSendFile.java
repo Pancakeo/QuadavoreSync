@@ -29,7 +29,7 @@ public class HehSendFile {
 
     void sendFile(final File[] files, final int current) {
         if (current >= files.length) {
-            m_activity.appendStatus("Done uploading!\n");
+            m_activity.appendStatus("Done uploading!");
             Log.d("Quadavore", "done uploading batch");
             return;
         }
@@ -74,7 +74,7 @@ public class HehSendFile {
 
                         if (e == null) {
                             Log.d("Quadavore", "Uploaded probably worked: " + result);
-                            m_activity.appendStatus("Probably uploaded " + originalFileName + "\n");
+                            m_activity.appendStatus("Probably uploaded " + originalFileName);
 
                             ContentValues values = new ContentValues();
                             values.put("log_name", originalFileName);
@@ -125,7 +125,7 @@ public class HehSendFile {
             files = filesToSend.toArray(new File[filesToSend.size()]);
 
             if (files.length > 0) {
-                m_activity.appendStatus("Uploading " + files.length + " file(s).\n");
+                m_activity.appendStatus("Uploading " + files.length + " file(s)");
                 sendFile(files, 0);
             } else {
                 m_activity.appendStatus("No new files to upload.");

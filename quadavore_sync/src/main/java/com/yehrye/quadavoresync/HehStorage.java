@@ -13,7 +13,6 @@ public class HehStorage extends SQLiteOpenHelper {
     @Override
     public void onCreate(SQLiteDatabase db) {
         // Maybe add a pk?
-        Log.d("Quadavore", "Heh!");
         db.execSQL("CREATE TABLE uploaded_logs (log_name TEXT)");
     }
 
